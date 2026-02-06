@@ -1,0 +1,8 @@
+atlas.todo
+atlas.todo.exe
+vendor/
+*.log
+.idea/
+build/
+.vscode/
+*.exe~

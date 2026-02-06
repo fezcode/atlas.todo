@@ -1,0 +1,65 @@
+# Atlas Todo
+
+![Banner Image](./banner-image.png)
+
+**atlas.todo** is a fast, keyboard-centric terminal user interface (TUI) for task management. Part of the **Atlas Suite**, it helps you organize your life with local-first storage, smart grouping, and Vim-like navigation.
+
+![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
+
+## ✨ Features
+
+- 📊 **Smart Grouping:** Cycle views by Category, Day, or Priority with a single key.
+- ⌨️ **Vim Bindings:** Navigate, edit, and move tasks without leaving the keyboard.
+- 🏷️ **Metadata Parsing:** Add `@category` or `!priority` (!high, !med, !low) directly in the task title.
+- 🔍 **Real-time Search:** Filter tasks instantly as you type.
+- 💾 **Local First:** Your data lives in `~/.atlas/todo.json`—no cloud, no latency.
+- 📦 **Cross-Platform:** Binaries available for Windows, Linux, and macOS.
+
+## 🚀 Installation
+
+### From Source
+```bash
+git clone https://github.com/fezcode/atlas.todo
+cd atlas.todo
+go build -o atlas.todo .
+```
+
+## ⌨️ Usage
+
+Simply run the binary to enter the TUI:
+```bash
+./atlas.todo
+```
+
+### CLI Quick Add
+Add a task without opening the UI (ensure you use quotes for tasks with metadata):
+```bash
+./atlas.todo add "Finish the report @work !high"
+```
+
+## 🕹️ Controls
+
+| Key | Action |
+|-----|--------|
+| `↑/↓` or `k/j` | Navigate tasks |
+| `Space` | Toggle task completion |
+| `n` | Create a new task |
+| `/` | Search/Filter tasks |
+| `g` | Cycle grouping (None, Category, Day, Priority) |
+| `s` | Cycle sorting (Default, Asc ↑, Desc ↓) |
+| `c` | Toggle showing completed tasks |
+| `d` | Delete task (requires confirmation) |
+| `q` or `Esc` | Quit |
+
+## 🏗️ Building for all platforms
+
+The project includes a Go-based build script to generate binaries for all platforms:
+
+```bash
+go run scripts/build.go
+```
+Binaries will be placed in the `build/` directory.
+
+## 📄 License
+MIT License - see [LICENSE](LICENSE) for details.
