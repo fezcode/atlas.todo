@@ -18,6 +18,7 @@ const (
 	adding
 	searching
 	deleting
+	editing
 )
 
 type Grouping int
@@ -41,7 +42,8 @@ type Model struct {
 	grouping     Grouping
 	width        int
 	height       int
-	taskToDelete *model.Task
+	taskToDelete model.Task
+	taskToEdit   model.Task
 	err          error
 }
 
@@ -113,8 +115,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "d":
 				tasks := m.filteredTasks()
 				if len(tasks) > 0 && m.cursor < len(tasks) {
-					t := tasks[m.cursor]
-					m.taskToDelete = &t
+					m.taskToDelete = tasks[m.cursor]
 					m.state = deleting
 				}
 			case "n":
@@ -122,6 +123,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.Reset()
 				m.textInput.Focus()
 				return m, textinput.Blink
+			case "e":
+				tasks := m.filteredTasks()
+				if len(tasks) > 0 && m.cursor < len(tasks) {
+					m.taskToEdit = tasks[m.cursor]
+					m.state = editing
+					m.textInput.SetValue(m.taskToEdit.Format())
+					m.textInput.Focus()
+					return m, textinput.Blink
+				}
 			case "/":
 				m.state = searching
 				m.searchInput.Reset()
@@ -182,18 +192,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case deleting:
 			switch msg.String() {
 			case "y", "Y", "enter":
-				if m.taskToDelete != nil {
-					targetID := m.taskToDelete.ID
-					for i, t := range m.store.Tasks {
-						if t.ID == targetID {
-							m.store.Delete(i)
-							break
-						}
+				targetID := m.taskToDelete.ID
+				for i, t := range m.store.Tasks {
+					if t.ID == targetID {
+						m.store.Delete(i)
+						break
 					}
-					_ = m.store.Save()
 				}
+				_ = m.store.Save()
 				m.state = browsing
-				m.taskToDelete = nil
 				tasks := m.filteredTasks()
 				if m.cursor >= len(tasks) && m.cursor > 0 {
 					m.cursor--
@@ -201,9 +208,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "n", "N", "esc", "q":
 				m.state = browsing
-				m.taskToDelete = nil
 				return m, nil
 			}
+
+		case editing:
+			switch msg.String() {
+			case "enter":
+				text := m.textInput.Value()
+				if text != "" {
+					updatedTask := model.ParseTask(text)
+					for i, t := range m.store.Tasks {
+						if t.ID == m.taskToEdit.ID {
+							m.store.Tasks[i].Title = updatedTask.Title
+							m.store.Tasks[i].Category = updatedTask.Category
+							m.store.Tasks[i].Priority = updatedTask.Priority
+							break
+						}
+					}
+					_ = m.store.Save()
+				}
+				m.state = browsing
+				return m, nil
+			case "esc":
+				m.state = browsing
+				return m, nil
+			}
+			m.textInput, cmd = m.textInput.Update(msg)
+			return m, cmd
 		}
 	}
 
@@ -278,6 +309,13 @@ func (m Model) View() string {
 	if m.state == adding {
 		return appStyle.Render(fmt.Sprintf(
 			"Create a new task:\n\n%s\n\n(esc to cancel, enter to save)",
+			m.textInput.View(),
+		))
+	}
+
+	if m.state == editing {
+		return appStyle.Render(fmt.Sprintf(
+			"Edit task:\n\n%s\n\n(esc to cancel, enter to save)",
 			m.textInput.View(),
 		))
 	}
@@ -404,8 +442,14 @@ func (m Model) View() string {
 		s = "\n  No tasks found.\n"
 	}
 
-	storageInfo := dateStyle.Render("\nStorage: ~/.atlas/todo.json (Auto-created)")
-	help := helpStyle.Render("\nj/k: move • space: toggle • n: new • /: search • d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
+		storageInfo := dateStyle.Render("\nStorage: ~/.atlas/todo.json (Auto-created)")
 
-	return appStyle.Render(header + s + storageInfo + help)
-}
+		help := helpStyle.Render("\nj/k: move • space: toggle • n: new • e: edit • /: search • d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
+
+	
+
+		return appStyle.Render(header + s + storageInfo + help)
+
+	}
+
+	

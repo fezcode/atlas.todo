@@ -23,11 +23,11 @@ var (
 			Foreground(lipgloss.Color("#6C6C6C"))
 
 	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262")).
+			Foreground(lipgloss.Color("#999999")).
 			MarginTop(1)
 
 	dateStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#555555"))
+			Foreground(lipgloss.Color("#999999"))
 
 	groupHeaderStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFD700")). // Gold

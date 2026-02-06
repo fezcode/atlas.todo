@@ -69,3 +69,23 @@ func ParseTask(input string) Task {
 	t.Title = strings.Join(cleanWords, " ")
 	return t
 }
+
+func (t Task) Format() string {
+	var parts []string
+	parts = append(parts, t.Title)
+	if t.Category != "" {
+		parts = append(parts, "@"+t.Category)
+	}
+	switch t.Priority {
+	case PriorityHigh:
+		parts = append(parts, "!high")
+	case PriorityMedium:
+		// parts = append(parts, "!med") // Med is default, maybe don't include it if it's default? 
+		// Actually, let's include it for clarity if we want to be explicit.
+		// But if it was parsed without it, maybe we should skip it.
+		// Let's include it if it's not the default to keep it simple.
+	case PriorityLow:
+		parts = append(parts, "!low")
+	}
+	return strings.Join(parts, " ")
+}
