@@ -38,6 +38,41 @@ Add a task without opening the UI (ensure you use quotes for tasks with metadata
 ./atlas.todo add "Finish the report @work !high"
 ```
 
+### CLI List Mode (MOTD)
+Display your top tasks and exit. Perfect for your shell's startup script.
+
+```bash
+# Show 5 tasks (default)
+./atlas.todo list
+
+# Show 3 tasks
+./atlas.todo list 3
+
+# Show top 5 high-priority tasks
+./atlas.todo list desc 5
+```
+
+### Shell Integration
+You can add `atlas.todo list` to your shell profile to see your tasks every time you open a terminal.
+
+**Bash (`~/.bashrc`) or Zsh (`~/.zshrc`):**
+```bash
+# Add to the end of your config file
+/path/to/atlas.todo list desc 5
+```
+
+**PowerShell (`$PROFILE`):**
+```powershell
+# Add to the end of your profile script
+& "C:\path\to\atlas.todo.exe" list desc 5
+```
+
+**Fish (`~/.config/fish/config.fish`):**
+```fish
+# Add to the end of your config file
+/path/to/atlas.todo list desc 5
+```
+
 ## 🕹️ Controls
 
 | Key | Action |

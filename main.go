@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,6 +44,66 @@ func main() {
 			}
 			fmt.Printf("Task added: %s\n", task.Title)
 			return
+		case "list":
+			// Default values
+			limit := 5
+			sortOrder := "default"
+
+			// Parse arguments
+			if len(os.Args) > 2 {
+				for _, arg := range os.Args[2:] {
+					if arg == "asc" || arg == "desc" {
+						sortOrder = arg
+					} else {
+						if val, err := strconv.Atoi(arg); err == nil {
+							limit = val
+						}
+					}
+				}
+			}
+
+			// Filter pending tasks
+			var pending []model.Task
+			for _, t := range store.Tasks {
+				if !t.Done {
+					pending = append(pending, t)
+				}
+			}
+
+			// Sort
+			if sortOrder == "asc" {
+				sort.Slice(pending, func(i, j int) bool {
+					return pending[i].Priority < pending[j].Priority
+				})
+			} else if sortOrder == "desc" {
+				sort.Slice(pending, func(i, j int) bool {
+					return pending[i].Priority > pending[j].Priority
+				})
+			}
+
+			// Print
+			if len(pending) == 0 {
+				fmt.Println("No pending tasks! 🎉")
+				return
+			}
+
+			count := 0
+			for _, t := range pending {
+				if count >= limit {
+					break
+				}
+
+				prioMarker := " "
+				if t.Priority == model.PriorityHigh {
+					prioMarker = "!"
+				} else if t.Priority == model.PriorityLow {
+					prioMarker = "."
+				}
+
+				fmt.Printf("[%s] %s\n", prioMarker, t.Format())
+				count++
+			}
+			return
 		case "help", "--help", "-h":
 			showHelp()
 			return
@@ -61,7 +123,13 @@ func showHelp() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  atlas.todo               Start the interactive TUI")
 	fmt.Println("  atlas.todo add \"[task]\"  Quickly add a task via command line")
+	fmt.Println("  atlas.todo list [opts]   List pending tasks (useful for MOTD)")
 	fmt.Println("  atlas.todo help          Show this help information")
+	fmt.Println("\nList Options:")
+	fmt.Println("  atlas.todo list          Show top 5 tasks (default order)")
+	fmt.Println("  atlas.todo list 3        Show top 3 tasks")
+	fmt.Println("  atlas.todo list asc      Show tasks sorted by priority (Low -> High)")
+	fmt.Println("  atlas.todo list desc 10  Show top 10 tasks sorted by priority (High -> Low)")
 	fmt.Println("\nNote: When using 'add' from CLI, wrap your task in quotes if it contains")
 	fmt.Println("      special characters or metadata like @category or !priority.")
 	fmt.Println("      Example: atlas.todo add \"Buy milk @grocery !high\"")
