@@ -66,7 +66,7 @@ func NewModel(store *storage.Store) Model {
 		state:       browsing,
 		sortByDate:  false,
 		sortAsc:     false, // Newest first by default
-		showDone:    true,
+		showDone:    false,
 		grouping:    GroupNone,
 	}
 }
