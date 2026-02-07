@@ -73,6 +73,57 @@ You can add `atlas.todo list` to your shell profile to see your tasks every time
 /path/to/atlas.todo list desc 5
 ```
 
+### ✨ Pro Tip: Advanced PowerShell Dashboard
+Want a more "alive" terminal? Copy this into your `$PROFILE` for a personalized greeting, a custom ASCII banner, and color-coded task highlighting:
+
+```powershell
+# --- 1. Setup ---
+$hour = (Get-Date).Hour
+$greeting = "Good Evening"
+if ($hour -lt 12) { $greeting = "Good Morning" }
+elseif ($hour -lt 18) { $greeting = "Good Afternoon" }
+
+# --- 2. Banner ---
+Write-Host "    ____                     _       " -ForegroundColor Magenta
+Write-Host "   / __/___ ___  _________  / /__    " -ForegroundColor Magenta
+Write-Host "  / /_ / _ \_  \/ ___/ __ \/ _  /___ " -ForegroundColor Magenta
+Write-Host " / __/  __// /_/ /__/ /_/ / /_/ / -_)" -ForegroundColor Magenta
+Write-Host "/_/  \___/____/\___/\____/\____/\__/ " -ForegroundColor Magenta
+
+Write-Host "`n  $greeting, $($env:USERNAME)! Focus on these items:`n" -ForegroundColor White
+
+# --- 3. Tasks ---
+if (Get-Command atlas.todo -ErrorAction SilentlyContinue) {
+    $taskList = & atlas.todo list desc 5
+
+    if ($null -eq $taskList -or $taskList.Count -eq 0 -or ($taskList -join " ") -match "No pending tasks") {
+        Write-Host "  ✨ Your board is clear! Ready for something new?" -ForegroundColor Green
+    } else {
+        foreach ($line in $taskList) {
+            if ($line -like "[!]*") { 
+                Write-Host "  $line" -ForegroundColor Red -NoNewline
+                Write-Host "  🔥" -ForegroundColor Red
+            }
+            elseif ($line -like "[.]*") { 
+                Write-Host "  $line" -ForegroundColor DarkGray 
+            }
+            else { 
+                Write-Host "  $line" -ForegroundColor Yellow 
+            }
+        }
+    }
+}
+
+# --- 4. Footer & Alias ---
+Write-Host "`n  --------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  Run 't' or 'atlas.todo' to manage tasks." -ForegroundColor Gray
+Write-Host ""
+
+if (-not (Get-Alias t -ErrorAction SilentlyContinue)) {
+    New-Alias -Name t -Value atlas.todo
+}
+```
+
 ## 🕹️ Controls
 
 | Key | Action |
