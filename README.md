@@ -108,10 +108,10 @@ You can use the [dashboard.ps1](./dashboard.ps1) script in your `$PROFILE`:
 
 ## 🏗️ Building for all platforms
 
-The project includes a Go-based build script to generate binaries for all platforms:
+The project uses **gobake** to generate binaries for all platforms:
 
 ```bash
-go run scripts/build.go
+gobake build
 ```
 Binaries will be placed in the `build/` directory.
 
