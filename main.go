@@ -13,7 +13,14 @@ import (
 	"atlas.todo/internal/ui"
 )
 
+var Version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
+		fmt.Printf("atlas.todo v%s\n", Version)
+		return
+	}
+
 	store, err := storage.NewStore()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error initializing store: %v\n", err)
