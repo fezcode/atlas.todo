@@ -2,8 +2,10 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,20 +66,33 @@ func (s *Store) Load() error {
 		return err
 	}
 
-	var sd storeData
-	if err := json.Unmarshal(data, &sd); err != nil {
-		// Fallback for old format (which was just []model.Task)
-		var tasks []model.Task
-		if err2 := json.Unmarshal(data, &tasks); err2 == nil {
-			s.Tasks = tasks
-			return nil
-		}
-		return err
+	trimmed := strings.TrimSpace(string(data))
+	if len(trimmed) == 0 {
+		return nil
 	}
 
-	s.Tasks = sd.Tasks
-	s.Config = sd.Config
-	return nil
+	// Case 1: New format (Object)
+	if trimmed[0] == '{' {
+		var sd storeData
+		if err := json.Unmarshal(data, &sd); err != nil {
+			return fmt.Errorf("failed to parse as object: %w", err)
+		}
+		s.Tasks = sd.Tasks
+		s.Config = sd.Config
+		return nil
+	}
+
+	// Case 2: Old format (Array)
+	if trimmed[0] == '[' {
+		var tasks []model.Task
+		if err := json.Unmarshal(data, &tasks); err != nil {
+			return fmt.Errorf("failed to parse as array: %w", err)
+		}
+		s.Tasks = tasks
+		return nil
+	}
+
+	return fmt.Errorf("unknown file format (must be { or [)")
 }
 
 func (s *Store) Save() error {
