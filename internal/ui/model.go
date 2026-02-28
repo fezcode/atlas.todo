@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"atlas.todo/internal/model"
@@ -44,6 +46,7 @@ type Model struct {
 	height       int
 	taskToDelete model.Task
 	taskToEdit   model.Task
+	statusMsg    string
 	err          error
 }
 
@@ -64,10 +67,10 @@ func NewModel(store *storage.Store) Model {
 		textInput:   ti,
 		searchInput: si,
 		state:       browsing,
-		sortByDate:  false,
-		sortAsc:     false, // Newest first by default
-		showDone:    false,
-		grouping:    GroupNone,
+		sortByDate:  store.Config.SortByDate,
+		sortAsc:     store.Config.SortAsc,
+		showDone:    store.Config.ShowDone,
+		grouping:    Grouping(store.Config.Grouping),
 	}
 }
 
@@ -75,10 +78,22 @@ func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+type clearStatusMsg struct{}
+
+func clearStatus() tea.Cmd {
+	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case clearStatusMsg:
+		m.statusMsg = ""
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -146,10 +161,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.sortByDate = false // Back to Default
 				}
+				m.store.Config.SortByDate = m.sortByDate
+				m.store.Config.SortAsc = m.sortAsc
+				_ = m.store.Save()
+				return m, nil
+			case "y":
+				tasks := m.filteredTasks()
+				if len(tasks) > 0 && m.cursor < len(tasks) {
+					task := tasks[m.cursor]
+					content := task.Title
+					if task.Category != "" {
+						content = fmt.Sprintf("%s (@%s)", task.Title, task.Category)
+					}
+					_ = clipboard.WriteAll(content)
+					m.statusMsg = "✓ Copied to clipboard!"
+					return m, clearStatus()
+				}
 				return m, nil
 			case "c":
 				m.showDone = !m.showDone
 				m.cursor = 0
+				m.store.Config.ShowDone = m.showDone
+				_ = m.store.Save()
 				return m, nil
 			case "g":
 				m.grouping++
@@ -157,6 +190,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.grouping = GroupNone
 				}
 				m.cursor = 0
+				m.store.Config.Grouping = int(m.grouping)
+				_ = m.store.Save()
 				return m, nil
 			}
 
@@ -442,13 +477,18 @@ func (m Model) View() string {
 		s = "\n  No tasks found.\n"
 	}
 
+		status := ""
+		if m.statusMsg != "" {
+			status = "\n" + statusStyle.Render(m.statusMsg)
+		}
+
 		storageInfo := dateStyle.Render("\nStorage: ~/.atlas/todo.json (Auto-created)")
 
-		help := helpStyle.Render("\nj/k: move • space: toggle • n: new • e: edit • /: search • d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
+		help := helpStyle.Render("\nj/k: move • space: toggle • n: new • e: edit • y: copy • /: search • d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
 
 	
 
-		return appStyle.Render(header + s + storageInfo + help)
+		return appStyle.Render(header + s + status + storageInfo + help)
 
 	}
 

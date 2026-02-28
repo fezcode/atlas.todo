@@ -10,10 +10,23 @@ import (
 	"atlas.todo/internal/model"
 )
 
+type Config struct {
+	ShowDone   bool `json:"show_done"`
+	SortByDate bool `json:"sort_by_date"`
+	SortAsc    bool `json:"sort_asc"`
+	Grouping   int  `json:"grouping"`
+}
+
+type storeData struct {
+	Tasks  []model.Task `json:"tasks"`
+	Config Config       `json:"config"`
+}
+
 type Store struct {
 	mu       sync.Mutex
 	filePath string
 	Tasks    []model.Task
+	Config   Config
 }
 
 func NewStore() (*Store, error) {
@@ -30,6 +43,12 @@ func NewStore() (*Store, error) {
 	return &Store{
 		filePath: filepath.Join(configDir, "todo.json"),
 		Tasks:    []model.Task{},
+		Config: Config{
+			ShowDone:   false,
+			SortByDate: false,
+			SortAsc:    false,
+			Grouping:   0,
+		},
 	}, nil
 }
 
@@ -45,14 +64,32 @@ func (s *Store) Load() error {
 		return err
 	}
 
-	return json.Unmarshal(data, &s.Tasks)
+	var sd storeData
+	if err := json.Unmarshal(data, &sd); err != nil {
+		// Fallback for old format (which was just []model.Task)
+		var tasks []model.Task
+		if err2 := json.Unmarshal(data, &tasks); err2 == nil {
+			s.Tasks = tasks
+			return nil
+		}
+		return err
+	}
+
+	s.Tasks = sd.Tasks
+	s.Config = sd.Config
+	return nil
 }
 
 func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, err := json.MarshalIndent(s.Tasks, "", "  ")
+	sd := storeData{
+		Tasks:  s.Tasks,
+		Config: s.Config,
+	}
+
+	data, err := json.MarshalIndent(sd, "", "  ")
 	if err != nil {
 		return err
 	}

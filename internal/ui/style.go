@@ -41,4 +41,8 @@ var (
 
 	categoryStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00D7FF"))
+
+	statusStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#25A065")).
+			Bold(true)
 )
