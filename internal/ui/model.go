@@ -398,10 +398,44 @@ func (m Model) View() string {
 	}
 
 	displayTasks := m.filteredTasks()
+	
+	// Clamp cursor just in case
+	if len(displayTasks) > 0 && m.cursor >= len(displayTasks) {
+		m.cursor = len(displayTasks) - 1
+	}
+
+	availableHeight := m.height - 15
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
+
+	startIdx := 0
+	endIdx := len(displayTasks)
+
+	if len(displayTasks) > availableHeight {
+		startIdx = m.cursor - availableHeight/2
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		endIdx = startIdx + availableHeight
+		if endIdx > len(displayTasks) {
+			endIdx = len(displayTasks)
+			startIdx = endIdx - availableHeight
+			if startIdx < 0 {
+				startIdx = 0
+			}
+		}
+	}
+
 	s := ""
 	var lastGroupKey string
 	
-	for i, task := range displayTasks {
+	if startIdx > 0 {
+		s += helpStyle.Render(fmt.Sprintf("  ... %d tasks hidden above ...", startIdx)) + "\n"
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		task := displayTasks[i]
 		currentGroupKey := ""
 		switch m.grouping {
 		case GroupCategory:
@@ -470,6 +504,10 @@ func (m Model) View() string {
 		
 		// Apply outer selection style (padding/bold) but avoid overriding Foreground if already set
 		s += baseStyle.Render(content) + "\n"
+	}
+
+	if endIdx < len(displayTasks) {
+		s += helpStyle.Render(fmt.Sprintf("  ... %d tasks hidden below ...", len(displayTasks)-endIdx)) + "\n"
 	}
 
 	if len(displayTasks) == 0 {
