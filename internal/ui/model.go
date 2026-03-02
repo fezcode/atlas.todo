@@ -435,12 +435,12 @@ func (m Model) View() string {
 
 		cursor := " "
 		if m.cursor == i {
-			cursor = ">"
+			cursor = cursorStyle.Render("❯")
 		}
 
-		checked := "[ ]"
+		checked := checkboxStyle.Render("☐")
 		if task.Done {
-			checked = "[x]"
+			checked = checkedStyle.Render("☑")
 		}
 
 		// Compose the content without styles first
@@ -462,7 +462,6 @@ func (m Model) View() string {
 			// Normal state: use specific colors
 			titlePart = task.Title
 			catPart = categoryStyle.Render(catStr)
-			datePart = dateStyle.Render(datePart) // Wait, was datePart or dateStr? Checking... dateStr.
 			datePart = dateStyle.Render(dateStr)
 		}
 
@@ -484,9 +483,7 @@ func (m Model) View() string {
 
 		storageInfo := dateStyle.Render("\nStorage: ~/.atlas/todo.json (Auto-created)")
 
-		help := helpStyle.Render("\nj/k: move • space: toggle • n: new • e: edit • y: copy • /: search • d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
-
-	
+		help := helpStyle.Render("\n ↑/↓, j/k: move • space: toggle • n: new • e: edit • y: copy • /: search\n d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
 
 		return appStyle.Render(header + s + status + storageInfo + help)
 
