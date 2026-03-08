@@ -21,6 +21,7 @@ const (
 	searching
 	deleting
 	editing
+	showingHelp
 )
 
 type Grouping int
@@ -97,7 +98,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		appStyle = appStyle.Width(msg.Width - 4).Height(msg.Height - 2)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -192,6 +192,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 				m.store.Config.Grouping = int(m.grouping)
 				_ = m.store.Save()
+				return m, nil
+			case "h":
+				m.state = showingHelp
+				return m, nil
+			}
+
+		case showingHelp:
+			switch msg.String() {
+			case "esc", "q", "h":
+				m.state = browsing
 				return m, nil
 			}
 
@@ -341,190 +351,300 @@ func (m Model) filteredTasks() []model.Task {
 }
 
 func (m Model) View() string {
+	// 1. Padding Logic (Manual)
+	topPad := 0
+	if m.height > 15 { topPad = 1 }
+	botPad := 0
+	if m.height > 10 { botPad = 1 }
+
+	style := appStyle.Width(m.width - 4)
+
+	// 2. State-specific Views
 	if m.state == adding {
-		return appStyle.Render(fmt.Sprintf(
+		return style.Render(fmt.Sprintf(
 			"Create a new task:\n\n%s\n\n(esc to cancel, enter to save)",
 			m.textInput.View(),
 		))
 	}
 
 	if m.state == editing {
-		return appStyle.Render(fmt.Sprintf(
+		return style.Render(fmt.Sprintf(
 			"Edit task:\n\n%s\n\n(esc to cancel, enter to save)",
 			m.textInput.View(),
 		))
 	}
 
+	if m.state == showingHelp {
+		content := titleStyle.Render("Atlas Todo - Help & Tutorial") + "\n\n"
+		
+		content += groupHeaderStyle.Render("Metadata Basics") + "\n"
+		content += "  • Category: Use @ (e.g., \"Buy milk @grocery\")\n"
+		content += "  • Priority: Use ! (e.g., \"Fix bug !high\", \"!low\")\n"
+		content += "  • Multiple: \"Meet John @work !medium\"\n\n"
+		
+		content += groupHeaderStyle.Render("Commands") + "\n"
+		content += "  ↑/↓, j/k: move cursor • space: toggle done\n"
+		content += "  n: new task      • e: edit selected\n"
+		content += "  d: delete task   • y: copy to clipboard\n"
+		content += "  s: cycle sort    • c: toggle completed\n"
+		content += "  g: cycle groups  • /: search tasks\n"
+		content += "  h: toggle help   • q: quit\n\n"
+
+		content += helpStyle.Render("(press h or esc to return)")
+		
+		return style.PaddingTop(topPad).Render(content)
+	}
+
+	// 3. Header Construction
 	statusParts := []string{}
-	orderStr := ""
 	if m.sortByDate {
-		if m.sortAsc {
-			orderStr = "↑"
-			statusParts = append(statusParts, "Sort: Asc "+orderStr)
-		} else {
-			orderStr = "↓"
-			statusParts = append(statusParts, "Sort: Desc "+orderStr)
-		}
+		orderStr := "↑"
+		if !m.sortAsc { orderStr = "↓" }
+		statusParts = append(statusParts, "Sort: "+orderStr)
 	}
-
-	if !m.showDone {
-		statusParts = append(statusParts, "Hidden: Done")
-	}
-
+	if !m.showDone { statusParts = append(statusParts, "Hidden: Done") }
 	switch m.grouping {
-	case GroupCategory:
-		statusParts = append(statusParts, "Group: Category")
-	case GroupDay:
-		statusParts = append(statusParts, "Group: Day")
-	case GroupPriority:
-		statusParts = append(statusParts, "Group: Priority")
+	case GroupCategory: statusParts = append(statusParts, "Group: Category")
+	case GroupDay: statusParts = append(statusParts, "Group: Day")
+	case GroupPriority: statusParts = append(statusParts, "Group: Priority")
 	}
 	
 	statusStr := ""
 	if len(statusParts) > 0 {
 		statusStr = fmt.Sprintf(" [%s]", strings.Join(statusParts, ", "))
+		if len(statusStr) > m.width-20 && m.width > 25 {
+			statusStr = statusStr[:m.width-23] + "...]"
+		} else if m.width <= 25 {
+			statusStr = ""
+		}
 	}
 
+	headerText := titleStyle.Render("Atlas Todo") + statusStr
+	headerLines := 1
+	
 	searchBar := ""
 	if m.state == searching || m.searchInput.Value() != "" {
-		searchBar = "\nSearch: " + m.searchInput.View() + "\n"
+		searchBar = "\nSearch: " + m.searchInput.View()
+		headerLines++
 	}
-
-	header := titleStyle.Render("Atlas Todo") + statusStr + searchBar + "\n"
+	headerText += searchBar + "\n" // Final newline
+	headerLines++
 
 	if m.state == deleting {
 		prompt := fmt.Sprintf("Delete \"%s\"? (y/n)", m.taskToDelete.Title)
-		return appStyle.Render(header + "\n" + deleteWarnStyle.Render(prompt))
+		return appStyle.Render(headerText + "\n" + deleteWarnStyle.Render(prompt))
 	}
 
-	displayTasks := m.filteredTasks()
+	// 4. Footer Logic & Height Budgeting
+	footerHeight := 0
+	showStatus := m.statusMsg != "" && m.height > 10
+	showHelpLine := m.height > 6
 	
-	// Clamp cursor just in case
+	if showStatus { footerHeight += 1 }
+	if showHelpLine { footerHeight += 1 }
+
+	// availableHeight is what's left for the task list
+	reserved := topPad + botPad + headerLines + footerHeight
+	lineBudget := m.height - reserved
+	if lineBudget < 1 { lineBudget = 1 }
+
+	displayTasks := m.filteredTasks()
 	if len(displayTasks) > 0 && m.cursor >= len(displayTasks) {
 		m.cursor = len(displayTasks) - 1
 	}
 
-	availableHeight := m.height - 15
-	if availableHeight < 5 {
-		availableHeight = 5
-	}
+	// 5. Robust Scroll / Offset Calculation
+	startIdx := m.cursor - (lineBudget / 2)
+	if startIdx < 0 { startIdx = 0 }
 
-	startIdx := 0
-	endIdx := len(displayTasks)
-
-	if len(displayTasks) > availableHeight {
-		startIdx = m.cursor - availableHeight/2
-		if startIdx < 0 {
-			startIdx = 0
-		}
-		endIdx = startIdx + availableHeight
-		if endIdx > len(displayTasks) {
-			endIdx = len(displayTasks)
-			startIdx = endIdx - availableHeight
-			if startIdx < 0 {
-				startIdx = 0
+	// Simulation loop to push startIdx forward until cursor is visible
+	for {
+		linesNeeded := 0
+		if startIdx > 0 { linesNeeded++ } // hidden above
+		
+		tempLastGroup := ""
+		if startIdx > 0 && m.grouping != GroupNone {
+			prevTask := displayTasks[startIdx-1]
+			switch m.grouping {
+			case GroupCategory: tempLastGroup = prevTask.Category
+			case GroupDay: tempLastGroup = prevTask.CreatedAt.Format("Monday, 02 Jan 2006")
+			case GroupPriority:
+				switch prevTask.Priority {
+				case model.PriorityHigh: tempLastGroup = "!!! High Priority"
+				case model.PriorityMedium: tempLastGroup = "!!  Medium Priority"
+				case model.PriorityLow: tempLastGroup = "!   Low Priority"
+				}
 			}
+			if tempLastGroup == "" && m.grouping == GroupCategory { tempLastGroup = "Uncategorized" }
 		}
+
+		cursorReached := false
+		for i := startIdx; i < len(displayTasks); i++ {
+			tBudget := lineBudget
+			if i < len(displayTasks)-1 { tBudget-- } // reserve for hidden below
+
+			if m.grouping != GroupNone {
+				gKey := ""
+				switch m.grouping {
+				case GroupCategory: gKey = displayTasks[i].Category
+					if gKey == "" { gKey = "Uncategorized" }
+				case GroupDay: gKey = displayTasks[i].CreatedAt.Format("Monday, 02 Jan 2006")
+				case GroupPriority:
+					switch displayTasks[i].Priority {
+					case model.PriorityHigh: gKey = "!!! High Priority"
+					case model.PriorityMedium: gKey = "!!  Medium Priority"
+					case model.PriorityLow: gKey = "!   Low Priority"
+					}
+				}
+				if gKey != tempLastGroup {
+					if linesNeeded > 0 { linesNeeded++ } // newline
+					linesNeeded++ // header
+					tempLastGroup = gKey
+				}
+			}
+			linesNeeded++ // task
+			
+			if i == m.cursor {
+				if linesNeeded <= tBudget { cursorReached = true }
+				break
+			}
+			if linesNeeded >= tBudget { break }
+		}
+
+		if cursorReached || startIdx >= m.cursor { break }
+		startIdx++
 	}
 
+	// 6. List Rendering (Budgeted)
 	s := ""
-	var lastGroupKey string
+	linesUsed := 0
 	
-	if startIdx > 0 {
-		s += helpStyle.Render(fmt.Sprintf("  ... %d tasks hidden above ...", startIdx)) + "\n"
+	if startIdx > 0 && linesUsed < lineBudget {
+		s += helpStyle.Render(fmt.Sprintf("  ... %d hidden above ...", startIdx)) + "\n"
+		linesUsed++
 	}
 
-	for i := startIdx; i < endIdx; i++ {
-		task := displayTasks[i]
-		currentGroupKey := ""
+	var lastGroupKey string
+	if startIdx > 0 && m.grouping != GroupNone {
+		prevTask := displayTasks[startIdx-1]
 		switch m.grouping {
-		case GroupCategory:
-			currentGroupKey = task.Category
-			if currentGroupKey == "" {
-				currentGroupKey = "Uncategorized"
-			}
-		case GroupDay:
-			currentGroupKey = task.CreatedAt.Format("Monday, 02 Jan 2006")
+		case GroupCategory: lastGroupKey = prevTask.Category
+		case GroupDay: lastGroupKey = prevTask.CreatedAt.Format("Monday, 02 Jan 2006")
 		case GroupPriority:
-			switch task.Priority {
-			case model.PriorityHigh:
-				currentGroupKey = "!!! High Priority"
-			case model.PriorityMedium:
-				currentGroupKey = "!!  Medium Priority"
-			case model.PriorityLow:
-				currentGroupKey = "!   Low Priority"
+			switch prevTask.Priority {
+			case model.PriorityHigh: lastGroupKey = "!!! High Priority"
+			case model.PriorityMedium: lastGroupKey = "!!  Medium Priority"
+			case model.PriorityLow: lastGroupKey = "!   Low Priority"
 			}
 		}
-
-		if m.grouping != GroupNone && currentGroupKey != lastGroupKey {
-			s += groupHeaderStyle.Render(currentGroupKey) + "\n"
-			lastGroupKey = currentGroupKey
-		}
-
-		// Selection & Base Style
-		baseStyle := itemStyle
-		if m.cursor == i {
-			baseStyle = selectedItemStyle
-		}
-
-		cursor := " "
-		if m.cursor == i {
-			cursor = cursorStyle.Render("❯")
-		}
-
-		checked := checkboxStyle.Render("☐")
-		if task.Done {
-			checked = checkedStyle.Render("☑")
-		}
-
-		// Compose the content without styles first
-		catStr := ""
-		if task.Category != "" {
-			catStr = fmt.Sprintf(" (@%s)", task.Category)
-		}
-		dateStr := task.CreatedAt.Format(" (2006-01-02 15:04)")
-		
-		// Build the line with targeted styling
-		var titlePart, catPart, datePart string
-		
-		if task.Done {
-			// If done, everything is grey/strikethrough
-			titlePart = doneStyle.Render(task.Title)
-			catPart = doneStyle.Render(catStr)
-			datePart = doneStyle.Render(dateStr)
-		} else {
-			// Normal state: use specific colors
-			titlePart = task.Title
-			catPart = categoryStyle.Render(catStr)
-			datePart = dateStyle.Render(dateStr)
-		}
-
-		// Assemble
-		content := fmt.Sprintf("%s %s %s%s%s", cursor, checked, titlePart, catPart, datePart)
-		
-		// Apply outer selection style (padding/bold) but avoid overriding Foreground if already set
-		s += baseStyle.Render(content) + "\n"
+		if lastGroupKey == "" && m.grouping == GroupCategory { lastGroupKey = "Uncategorized" }
 	}
 
-	if endIdx < len(displayTasks) {
-		s += helpStyle.Render(fmt.Sprintf("  ... %d tasks hidden below ...", len(displayTasks)-endIdx)) + "\n"
+	lastTaskIdx := startIdx - 1
+	for i := startIdx; i < len(displayTasks); i++ {
+		// Reserve 1 line for "hidden below" if not at the end
+		currentBudget := lineBudget
+		if i < len(displayTasks)-1 { currentBudget-- }
+
+		if linesUsed >= currentBudget { break }
+
+		task := displayTasks[i]
+		
+		// Handle Grouping
+		if m.grouping != GroupNone {
+			currentGroupKey := ""
+			switch m.grouping {
+			case GroupCategory:
+				currentGroupKey = task.Category
+				if currentGroupKey == "" { currentGroupKey = "Uncategorized" }
+			case GroupDay:
+				currentGroupKey = task.CreatedAt.Format("Monday, 02 Jan 2006")
+			case GroupPriority:
+				switch task.Priority {
+				case model.PriorityHigh: currentGroupKey = "!!! High Priority"
+				case model.PriorityMedium: currentGroupKey = "!!  Medium Priority"
+				case model.PriorityLow: currentGroupKey = "!   Low Priority"
+				}
+			}
+			
+			if currentGroupKey != lastGroupKey {
+				// No space for newline/header/task combo? 
+				// We need at least 2 lines (header + task) or 3 (newline + header + task)
+				neededLines := 2
+				if linesUsed > 0 { neededLines = 3 }
+				
+				if linesUsed + neededLines <= currentBudget {
+					if linesUsed > 0 {
+						s += "\n"
+						linesUsed++
+					}
+					s += groupHeaderStyle.Render(currentGroupKey) + "\n"
+					lastGroupKey = currentGroupKey
+					linesUsed++
+				} else {
+					break // No room for the next group
+				}
+			}
+		}
+
+		// Render Task
+		if linesUsed < currentBudget {
+			baseStyle := itemStyle
+			if m.cursor == i { baseStyle = selectedItemStyle }
+
+			cursor := " "
+			if m.cursor == i { cursor = cursorStyle.Render("❯") }
+
+			checked := checkboxStyle.Render("☐")
+			if task.Done { checked = checkedStyle.Render("☑") }
+
+			catStr := ""
+			if task.Category != "" { catStr = fmt.Sprintf(" (@%s)", task.Category) }
+			dateStr := task.CreatedAt.Format(" (2006-01-02 15:04)")
+			
+			var titlePart, catPart, datePart string
+			if task.Done {
+				titlePart = doneStyle.Render(task.Title)
+				catPart = doneStyle.Render(catStr)
+				datePart = doneStyle.Render(dateStr)
+			} else {
+				titlePart = task.Title
+				catPart = categoryStyle.Render(catStr)
+				datePart = dateStyle.Render(dateStr)
+			}
+
+			content := fmt.Sprintf("%s %s %s%s%s", cursor, checked, titlePart, catPart, datePart)
+			s += baseStyle.Render(content) + "\n"
+			linesUsed++
+			lastTaskIdx = i
+		} else {
+			break
+		}
+	}
+
+	if lastTaskIdx < len(displayTasks)-1 {
+		hiddenBelow := len(displayTasks) - 1 - lastTaskIdx
+		if hiddenBelow > 0 && linesUsed < lineBudget {
+			s += helpStyle.Render(fmt.Sprintf("  ... %d hidden below ...", hiddenBelow)) + "\n"
+			linesUsed++
+		}
 	}
 
 	if len(displayTasks) == 0 {
 		s = "\n  No tasks found.\n"
 	}
 
-		status := ""
-		if m.statusMsg != "" {
-			status = "\n" + statusStyle.Render(m.statusMsg)
-		}
-
-		storageInfo := dateStyle.Render("\nStorage: ~/.atlas/todo.json (Auto-created)")
-
-		help := helpStyle.Render("\n ↑/↓, j/k: move • space: toggle • n: new • e: edit • y: copy • /: search\n d: delete • g: group • s: sort cycle • c: toggle done • q: quit")
-
-		return appStyle.Render(header + s + status + storageInfo + help)
-
+	// 7. Footer Construction
+	footer := ""
+	if showStatus { footer += "\n" + statusStyle.Render(m.statusMsg) }
+	
+	if showHelpLine {
+		footer += "\n" + helpStyle.Render("h: help")
 	}
+
+	// 8. Final Assembly
+	res := strings.Repeat("\n", topPad) + headerText + s + footer
+	return style.Render(res)
+}
 
 	

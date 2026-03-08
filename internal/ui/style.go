@@ -3,7 +3,9 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	appStyle = lipgloss.NewStyle().Padding(1, 2)
+	appStyle = lipgloss.NewStyle().
+			Padding(1, 2).
+			AlignVertical(lipgloss.Top)
 
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFFDF5")).
@@ -24,8 +26,7 @@ var (
 			Foreground(lipgloss.Color("#6C6C6C"))
 
 	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262")).
-			MarginTop(1)
+			Foreground(lipgloss.Color("#626262"))
 
 	dateStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262"))
@@ -33,7 +34,6 @@ var (
 	groupHeaderStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#B3B3FF")).
 			Bold(true).
-			PaddingTop(1).
 			PaddingBottom(0).
 			Underline(true)
 
